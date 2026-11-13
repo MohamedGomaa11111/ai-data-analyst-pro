@@ -1,1056 +1,916 @@
 import os
 import re
-import streamlit as st
-import pandas as pd
+import json
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 from google import genai
 
-# 1. إعدادات الصفحة الأساسية
+# ==========================================
+# 1. إعداد الصفحة والهوية البصرية (Dark Navy & Gold)
+# ==========================================
 st.set_page_config(
     page_title="AI Data Analyst Pro | Mohamed Gomaa",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# 2. حقن كود CSS احترافي متكامل (Dark Navy, Gold Accents, Glassmorphism & RTL)
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
 
-    /* الخط العام والخلفية الرئيسية */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
+
     .stApp {
-        background: radial-gradient(circle at top right, #131c31 0%, #0a0f1c 60%, #060911 100%);
+        background-color: #080d1a;
         color: #f3f4f6;
     }
 
-    /* إخفاء عناصر Streamlit الافتراضية */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-
-    /* محاذاة النصوص العربية RTL */
-    h1, h2, h3, h4, p, .stMarkdown, .stAlert, .stCaption {
-        direction: rtl;
-        text-align: right;
-    }
-    /* الحفاظ على الجداول والأكواد LTR */
-    [data-testid="stDataFrame"], code, pre {
-        direction: ltr;
+    section[data-testid="stSidebar"] {
+        background-color: #0b1120;
+        border-right: 1px solid #1e293b;
     }
 
-    /* تنسيق الشريط الجانبي Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d1323 0%, #090d18 100%);
-        border-right: 1px solid rgba(212, 175, 55, 0.25);
+    .hero-badge {
+        display: inline-block;
+        background: rgba(201, 162, 39, 0.12);
+        border: 1px solid #c9a227;
+        color: #e5c158;
+        padding: 5px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 10px;
     }
 
-    /* تصميم كروت الأرقام (Metrics) بتأثير Glassmorphism */
-    [data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(212, 175, 55, 0.28);
-        border-radius: 14px;
-        padding: 15px 14px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-        transition: all 0.25s ease;
-        direction: rtl;
-        text-align: right;
-    }
-    [data-testid="stMetric"]:hover {
-        transform: translateY(-4px);
-        border-color: #d4af37;
-        box-shadow: 0 10px 28px rgba(212, 175, 55, 0.15);
-    }
-    [data-testid="stMetricLabel"] {
-        color: #9ca3af !important;
-        font-size: 0.9rem !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #d4af37 !important;
-        font-weight: 700 !important;
-        font-size: 1.55rem !important;
+    .hero-title {
+        color: #e5c158;
+        font-size: 2.3rem;
+        font-weight: 800;
+        margin: 0;
+        line-height: 1.3;
     }
 
-    /* تخصيص الأزرار: الزر الرئيسي بتدرج ذهبي فخم */
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #d4af37 0%, #f3d06b 50%, #b89225 100%) !important;
-        color: #0a0f1c !important;
-        font-weight: 700 !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 0.6rem 1.2rem !important;
-        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3) !important;
-        transition: all 0.25s ease !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 22px rgba(212, 175, 55, 0.5) !important;
+    .hero-subtitle {
+        color: #94a3b8;
+        font-size: 1rem;
+        margin-top: 6px;
+        margin-bottom: 22px;
     }
 
-    /* الأزرار الفرعية الزجاجية */
-    div.stButton > button[kind="secondary"], div.stDownloadButton > button {
-        background: rgba(255, 255, 255, 0.04) !important;
-        color: #f3f4f6 !important;
-        border: 1px solid rgba(212, 175, 55, 0.3) !important;
-        border-radius: 10px !important;
-        transition: all 0.2s ease !important;
-    }
-    div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
-        border-color: #d4af37 !important;
-        background: rgba(212, 175, 55, 0.12) !important;
-        color: #d4af37 !important;
-    }
-
-    /* تنسيق التبويبات Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background-color: rgba(255, 255, 255, 0.02);
-        padding: 8px;
+    .kpi-card {
+        background: linear-gradient(145deg, #0d1426, #111a30);
+        border: 1px solid #1e293b;
+        border-top: 3px solid #c9a227;
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        direction: rtl;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
     }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 10px 18px;
-        color: #9ca3af;
+
+    .kpi-label {
+        color: #94a3b8;
+        font-size: 0.88rem;
         font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.08)) !important;
-        color: #d4af37 !important;
-        border: 1px solid rgba(212, 175, 55, 0.45);
+        margin-bottom: 6px;
     }
 
-    /* تنسيق الجداول والقوائم المنسدلة وإصلاح تباين الألوان */
-    [data-testid="stDataFrame"] {
-        border: 1px solid rgba(212, 175, 55, 0.2);
-        border-radius: 12px;
-        overflow: hidden;
+    .kpi-value {
+        color: #e5c158;
+        font-size: 1.75rem;
+        font-weight: 800;
     }
-    [data-testid="stExpander"] {
-        background: rgba(15, 23, 42, 0.85) !important;
-        border: 1px solid rgba(212, 175, 55, 0.28) !important;
-        border-radius: 12px;
+
+    .section-header {
+        color: #ffffff;
+        font-size: 1.35rem;
+        font-weight: 700;
+        border-right: 4px solid #c9a227;
+        padding-right: 12px;
+        margin: 18px 0 12px 0;
         direction: rtl;
-        color: #f3f4f6 !important;
-    }
-    [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary p,
-    [data-testid="stExpander"] label,
-    [data-testid="stExpander"] span {
-        color: #f3f4f6 !important;
-    }
-    [data-testid="stExpander"] details {
-        background-color: transparent !important;
+        text-align: right;
     }
 
-    /* شريط التقدم الذهبي لمؤشر جودة البيانات */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #b89225, #d4af37, #f3d06b);
+    .callout-box {
+        background-color: #f8fafc;
+        color: #0f172a;
+        border-right: 5px solid #c9a227;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        direction: rtl;
+        text-align: right;
+        margin: 10px 0;
     }
-</style>
-""", unsafe_allow_html=True)
 
-# قراءة مفتاح Gemini API تلقائياً من secrets.toml أو متغيرات البيئة
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
-except Exception:
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #c9a227, #e5c158);
+        color: #080d1a;
+        font-weight: 800;
+        border: none;
+        border-radius: 8px;
+        padding: 0.55rem 1.2rem;
+    }
 
-# دالة إنشاء بيانات مبيعات تجريبية جاهزة لاختبار الزوار الفوري
-def load_sample_dataset():
+    div.stButton > button[kind="primary"]:hover {
+        background: linear-gradient(90deg, #e5c158, #f3d274);
+        color: #080d1a;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ==========================================
+# 2. دوال مساعدة (البيانات التجريبية، التنظيف، التنسيق، AI)
+# ==========================================
+def generate_sample_data() -> pd.DataFrame:
     np.random.seed(42)
-    dates = pd.date_range("2026-01-01", periods=120, freq="D")
-    branches = ["القاهرة", "الإسكندرية", "أسوان", "المنصورة"]
-    categories = ["إلكترونيات", "أجهزة منزلية", "إكسسوارات", "برمجيات"]
-    payment_methods = ["كاش", "إنستاباي", "بطاقة بنكية"]
-    
-    qty = np.random.randint(1, 15, size=120)
-    unit_price = np.random.choice([250, 500, 1200, 3500, 7500], size=120)
-    
-    return pd.DataFrame({
-        "order_date": dates,
-        "branch": np.random.choice(branches, size=120),
-        "category": np.random.choice(categories, size=120),
-        "payment_method": np.random.choice(payment_methods, size=120),
-        "quantity": qty,
-        "unit_price": unit_price,
-        "total_sales": qty * unit_price
-    })
+    n = 120
+    dates = pd.date_range("2026-01-01", periods=n, freq="D")
+    branches = ["أسوان", "الإسكندرية", "المنصورة", "القاهرة"]
+    categories = ["أجهزة منزلية", "إلكترونيات", "إكسسوارات", "برمجيات"]
+    payments = ["إنستاباي", "بطاقة بنكية", "كاش"]
 
-# دوال التنظيف الاحترافية مع إرجاع تقرير تفصيلي
-def log_action(message):
-    if "cleaning_log" not in st.session_state:
-        st.session_state.cleaning_log = []
-    st.session_state.cleaning_log.append(f"✔ {message}")
-    st.session_state.last_report = message
+    qty = np.random.randint(1, 15, size=n)
+    price = np.random.choice([250, 500, 1200, 2500, 3500], size=n)
+    total_sales = qty * price
+    profit = np.round(total_sales * np.random.uniform(0.18, 0.35, size=n), 2)
 
-def standardize_col_names(dataframe):
-    df_copy = dataframe.copy()
-    old_cols = list(df_copy.columns)
-    new_cols = []
-    seen = {}
-    for col in old_cols:
-        clean_col = re.sub(r'[^\w\s]', '', str(col)).strip().lower()
-        clean_col = re.sub(r'\s+', '_', clean_col)
-        if not clean_col:
-            clean_col = "unnamed_col"
-        if clean_col in seen:
-            seen[clean_col] += 1
-            clean_col = f"{clean_col}_{seen[clean_col]}"
-        else:
-            seen[clean_col] = 0
-        new_cols.append(clean_col)
-    df_copy.columns = new_cols
-    changed = sum(1 for o, n in zip(old_cols, new_cols) if str(o) != n)
-    return df_copy, changed
+    df = pd.DataFrame(
+        {
+            "order_date": dates,
+            "branch": np.random.choice(branches, size=n),
+            "category": np.random.choice(categories, size=n),
+            "payment_method": np.random.choice(payments, size=n),
+            "quantity": qty,
+            "unit_price": price,
+            "total_sales": total_sales,
+            "profit": profit,
+        }
+    )
+    return df
 
-def normalize_hidden_nulls(dataframe):
-    df_copy = dataframe.copy()
-    null_tokens = ["n/a", "na", "null", "none", "-", "--", "?", "nan", ""]
-    before_nulls = df_copy.isnull().sum().sum()
-    for col in df_copy.select_dtypes(include=['object']).columns:
-        df_copy[col] = df_copy[col].apply(
-            lambda x: np.nan if (isinstance(x, str) and x.strip().lower() in null_tokens) else x
-        )
-    after_nulls = df_copy.isnull().sum().sum()
-    return df_copy, int(after_nulls - before_nulls)
 
-def promote_header_if_needed(dataframe):
-    df_copy = dataframe.copy()
-    unnamed_ratio = sum(1 for col in df_copy.columns if 'unnamed' in str(col).lower()) / max(len(df_copy.columns), 1)
-    if unnamed_ratio >= 0.4 and len(df_copy) > 0:
-        for idx in range(min(8, len(df_copy))):
-            row_values = df_copy.iloc[idx]
-            non_null_ratio = row_values.notna().mean()
-            str_ratio = sum(1 for v in row_values.dropna() if isinstance(v, str) and not v.strip().replace('.', '').isdigit()) / max(row_values.notna().sum(), 1)
-            if non_null_ratio >= 0.75 and str_ratio >= 0.6:
-                new_headers = [str(v).strip() if pd.notna(v) else f"col_{i}" for i, v in enumerate(row_values)]
-                df_copy.columns = new_headers
-                df_copy = df_copy.iloc[idx + 1:].reset_index(drop=True)
-                return df_copy, True
-    return df_copy, False
+def style_plotly_fig(fig: go.Figure, title: str = "") -> go.Figure:
+    """توحيد ثيم الرسوم البيانية بالألوان الداكنة مع توضيح النصوص والـ Legend."""
+    fig.update_layout(
+        title=dict(text=title, font=dict(color="#e5c158", size=16), x=0.5, xanchor="center"),
+        paper_bgcolor="#0d1426",
+        plot_bgcolor="#080d1a",
+        font=dict(color="#f3f4f6", family="Cairo, sans-serif", size=12),
+        legend=dict(
+            font=dict(color="#ffffff", size=12),
+            bgcolor="rgba(15, 23, 42, 0.85)",
+            bordercolor="#334155",
+            borderwidth=1,
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
+        xaxis=dict(
+            gridcolor="rgba(148, 163, 184, 0.15)",
+            zerolinecolor="rgba(148, 163, 184, 0.25)",
+            tickfont=dict(color="#cbd5e1"),
+            title_font=dict(color="#e5c158"),
+        ),
+        yaxis=dict(
+            gridcolor="rgba(148, 163, 184, 0.15)",
+            zerolinecolor="rgba(148, 163, 184, 0.25)",
+            tickfont=dict(color="#cbd5e1"),
+            title_font=dict(color="#e5c158"),
+        ),
+        margin=dict(l=30, r=30, t=60, b=40),
+    )
+    return fig
 
-def smart_fix_types(dataframe):
-    df_fixed = dataframe.copy()
-    converted_cols = []
-    protected_keywords = ['id', 'code', 'phone', 'mobile', 'tel', 'sku', 'serial', 'zip', 'postal', 'كود', 'هاتف', 'تليفون', 'رقم']
-    
-    for col in df_fixed.select_dtypes(include=['object']).columns:
-        col_lower = col.lower()
-        if any(kw in col_lower for kw in protected_keywords):
-            continue
-        non_null_series = df_fixed[col].dropna().astype(str)
-        if non_null_series.empty:
-            continue
-        if non_null_series.str.startswith('0').mean() > 0.3 and not non_null_series.str.startswith('0.').any():
-            continue
 
-        cleaned_series = df_fixed[col].astype(str).str.replace(r'[^\d.\-]', '', regex=True)
-        numeric_converted = pd.to_numeric(cleaned_series, errors='coerce')
-        if (numeric_converted.notnull().sum() / len(non_null_series)) >= 0.8:
-            df_fixed[col] = numeric_converted
-            converted_cols.append(f"{col} (رقمي)")
-            continue
-        
-        if any(word in col_lower for word in ['date', 'time', 'day', 'month', 'year', 'تاريخ']):
-            try:
-                date_converted = pd.to_datetime(df_fixed[col], errors='coerce', dayfirst=True)
-                if (date_converted.notnull().sum() / len(non_null_series)) >= 0.8:
-                    df_fixed[col] = date_converted
-                    converted_cols.append(f"{col} (تاريخ)")
-            except Exception:
-                pass
-    return df_fixed, converted_cols
+def calculate_health_score(df: pd.DataFrame) -> tuple[int, int, int]:
+    total_cells = max(df.shape[0] * df.shape[1], 1)
+    nulls = int(df.isna().sum().sum())
+    dups = int(df.duplicated().sum())
+    null_penalty = (nulls / total_cells) * 60
+    dup_penalty = (dups / max(len(df), 1)) * 40
+    score = int(max(0, min(100, round(100 - null_penalty - dup_penalty))))
+    return score, dups, nulls
 
-def calculate_health_score(dataframe):
-    total_cells = dataframe.size
-    if total_cells == 0:
-        return 100
-    null_cells = dataframe.isnull().sum().sum()
-    dup_rows = dataframe.duplicated().sum() * dataframe.shape[1]
-    penalty = ((null_cells + dup_rows) / total_cells) * 100
-    return max(0, min(100, round(100 - penalty, 1)))
 
-def call_gemini_api(prompt_text):
-    client = genai.Client(api_key=api_key)
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+def auto_clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    cleaned = df.copy()
+    logs = []
+
+    # 1. توحيد أسماء الأعمدة
+    old_cols = list(cleaned.columns)
+    cleaned.columns = [
+        re.sub(r"\s+", "_", str(c).strip().lower()) for c in cleaned.columns
+    ]
+    if list(cleaned.columns) != old_cols:
+        logs.append("تم توحيد أسماء الأعمدة وإزالة المسافات الزائدة.")
+
+    # 2. إزالة الصفوف المكررة
+    dup_count = int(cleaned.duplicated().sum())
+    if dup_count > 0:
+        cleaned = cleaned.drop_duplicates().reset_index(drop=True)
+        logs.append(f"تم حذف {dup_count} صف مكرر.")
+
+    # 3. تنظيف النصوص وتحويل التواريخ والأرقام
+    for col in cleaned.columns:
+        if cleaned[col].dtype == "object":
+            cleaned[col] = cleaned[col].astype(str).str.strip()
+            cleaned[col] = cleaned[col].replace({"nan": np.nan, "None": np.nan, "": np.nan})
+
+            if any(k in col for k in ["date", "time", "تاريخ"]):
+                parsed = pd.to_datetime(cleaned[col], errors="coerce")
+                if parsed.notna().sum() > len(cleaned) * 0.6:
+                    cleaned[col] = parsed
+                    logs.append(f"تم تحويل العمود ({col}) إلى صيغة تاريخ.")
+                    continue
+
+            numeric_try = pd.to_numeric(
+                cleaned[col].astype(str).str.replace(",", ""), errors="coerce"
+            )
+            if numeric_try.notna().sum() > len(cleaned) * 0.8 and cleaned[col].notna().sum() > 0:
+                cleaned[col] = numeric_try
+                logs.append(f"تم تصحيح نوع العمود ({col}) إلى رقمي.")
+
+    # 4. معالجة القيم المفقودة
+    null_before = int(cleaned.isna().sum().sum())
+    if null_before > 0:
+        for col in cleaned.columns:
+            if cleaned[col].isna().sum() > 0:
+                if pd.api.types.is_numeric_dtype(cleaned[col]):
+                    cleaned[col] = cleaned[col].fillna(cleaned[col].median())
+                elif pd.api.types.is_datetime64_any_dtype(cleaned[col]):
+                    cleaned[col] = cleaned[col].ffill().bfill()
+                else:
+                    mode_val = cleaned[col].mode()
+                    fill_val = mode_val.iloc[0] if not mode_val.empty else "غير محدد"
+                    cleaned[col] = cleaned[col].fillna(fill_val)
+        logs.append(f"تمت معالجة {null_before} قيمة مفقودة تلقائياً.")
+
+    if not logs:
+        logs.append("تنظيف ذكي شامل: البيانات نظيفة بالفعل ولا توجد أخطاء شكلية!")
+
+    return cleaned, logs
+
+
+def get_gemini_client():
+    api_key = None
     try:
-        for m in client.models.list():
-            m_id = m.name.replace("models/", "")
-            if "gemini" in m_id and m_id not in models_to_try:
-                models_to_try.append(m_id)
+        api_key = st.secrets.get("GEMINI_API_KEY")
     except Exception:
         pass
+    if not api_key:
+        api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
 
-    last_err = None
-    for m_name in models_to_try:
+
+def ask_gemini_with_fallback(prompt: str) -> str:
+    client = get_gemini_client()
+    if not client:
+        return "⚠️ لم يتم العثور على مفتاح `GEMINI_API_KEY` في إعدادات التطبيق (Secrets)."
+
+    models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+    last_err = ""
+    for model_name in models:
         try:
-            return client.models.generate_content(model=m_name, contents=prompt_text)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            if response and response.text:
+                return response.text
         except Exception as e:
-            last_err = e
+            last_err = str(e)
             continue
-    raise last_err
+    return f"⚠️ تعذر الاتصال بخدمة الذكاء الاصطناعي حالياً. التفاصيل: {last_err}"
 
-def build_html_report(report_md, file_name, rows_count, cols_count, health):
-    html_body = report_md.replace("\n", "<br>")
-    return f"""<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>Executive Data Report - {file_name}</title>
-<style>
-    body {{
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #0a0f1c;
-        color: #f3f4f6;
-        margin: 0;
-        padding: 35px;
-        line-height: 1.8;
-    }}
-    .container {{
-        max-width: 900px;
-        margin: auto;
-        background: #111827;
-        border: 1px solid #d4af37;
-        border-radius: 16px;
-        padding: 32px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }}
-    .header {{
-        border-bottom: 2px solid #d4af37;
-        padding-bottom: 16px;
-        margin-bottom: 24px;
-        text-align: center;
-    }}
-    .header h1 {{
-        color: #d4af37;
-        margin: 0;
-        font-size: 26px;
-    }}
-    .meta {{
-        display: flex;
-        justify-content: space-around;
-        background: rgba(212, 175, 55, 0.08);
-        border: 1px solid rgba(212, 175, 55, 0.3);
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 24px;
-        font-weight: bold;
-        color: #f3d06b;
-    }}
-    .content {{
-        font-size: 15px;
-        color: #e5e7eb;
-    }}
-    .footer {{
-        margin-top: 30px;
-        padding-top: 12px;
-        border-top: 1px solid #374151;
-        text-align: center;
-        font-size: 12px;
-        color: #9ca3af;
-    }}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="header">
-        <h1>📊 التقرير التنفيذي والاستراتيجية التحليلية</h1>
-        <p style="color:#9ca3af; margin:5px 0 0 0;">ملف البيانات: {file_name}</p>
-    </div>
-    <div class="meta">
-        <span>إجمالي الصفوف: {rows_count:,}</span>
-        <span>عدد الأعمدة: {cols_count}</span>
-        <span>جودة البيانات: {health}%</span>
-    </div>
-    <div class="content">{html_body}</div>
-    <div class="footer">Generated by AI Data Analyst Pro | Engineered by Mohamed Gomaa</div>
-</div>
-</body>
-</html>"""
 
-# 3. الشريط الجانبي (Sidebar)
+# ==========================================
+# 3. إدارة الحالة (Session State) والقائمة الجانبية
+# ==========================================
+if "raw_df" not in st.session_state:
+    st.session_state.raw_df = None
+if "df" not in st.session_state:
+    st.session_state.df = None
+if "clean_logs" not in st.session_state:
+    st.session_state.clean_logs = []
+if "file_signature" not in st.session_state:
+    st.session_state.file_signature = None
+
 with st.sidebar:
-    st.markdown("<h2 style='color: #d4af37; text-align: center;'>⚡ AI Data Analyst</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #9ca3af; font-size: 0.85rem;'>منصة التحليل الذكي وتنظيف البيانات</p>", unsafe_allow_html=True)
-    st.divider()
-    
-    uploaded_file = st.file_uploader(
-        "📂 ارفع ملف البيانات هنا", 
-        type=["csv", "xlsx"],
-        help="يدعم ملفات CSV و Excel حتى 200 ميجابايت"
+    st.markdown(
+        """
+        <div style="text-align:center; padding: 10px 0 18px 0;">
+            <div style="font-size: 1.55rem; font-weight: 800; color: #e5c158;">AI Data Analyst ⚡</div>
+            <div style="font-size: 0.82rem; color: #94a3b8;">منصة التحليل الذكي وتنظيف البيانات</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    
-    st.markdown("<p style='text-align: center; color: #9ca3af; font-size: 0.8rem; margin: 4px 0;'>— أو —</p>", unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader(
+        "📂 ارفع ملف البيانات هنا",
+        type=["csv", "xlsx"],
+        help="يدعم ملفات CSV و Excel حتى 200MB",
+    )
+
+    if uploaded_file is not None:
+        sig = f"{uploaded_file.name}_{uploaded_file.size}"
+        if st.session_state.file_signature != sig:
+            try:
+                if uploaded_file.name.lower().endswith(".csv"):
+                    loaded = pd.read_csv(uploaded_file)
+                else:
+                    loaded = pd.read_excel(uploaded_file)
+                st.session_state.raw_df = loaded.copy()
+                cleaned_df, logs = auto_clean_dataframe(loaded)
+                st.session_state.df = cleaned_df
+                st.session_state.clean_logs = logs
+                st.session_state.file_signature = sig
+            except Exception as e:
+                st.error(f"حدث خطأ أثناء قراءة الملف: {e}")
+
+    st.markdown("<div style='text-align:center; color:#64748b; margin:6px 0;'>— أو —</div>", unsafe_allow_html=True)
+
     if st.button("🚀 جرب ببيانات مبيعات جاهزة", use_container_width=True):
-        sample_df = load_sample_dataset()
-        st.session_state.current_file = "Sample_Sales_Data.xlsx"
-        st.session_state.raw_df = sample_df.copy()
-        st.session_state.df = sample_df.copy()
-        st.session_state.cleaning_log = ["تم تحميل بيانات المبيعات التجريبية بنجاح"]
-        st.session_state.last_report = None
-        st.session_state.exec_report_md = None
-        st.rerun()
+        demo = generate_sample_data()
+        st.session_state.raw_df = demo.copy()
+        st.session_state.df = demo.copy()
+        st.session_state.clean_logs = ["تم تحميل بيانات المبيعات التجريبية بنجاح (120 صف)."]
+        st.session_state.file_signature = "demo_sales_data"
 
-    if "cleaning_log" in st.session_state and st.session_state.cleaning_log:
-        st.divider()
-        st.markdown("### 📜 سجل خطوات التنظيف")
-        for item in st.session_state.cleaning_log:
-            st.caption(item)
+    if st.session_state.clean_logs:
+        st.markdown("---")
+        st.markdown("#### 📜 سجل خطوات التنظيف")
+        for item in st.session_state.clean_logs:
+            st.caption(f"✅ {item}")
 
-    st.divider()
-    st.markdown("""
-    <div style='text-align: center; direction: ltr; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid rgba(212, 175, 55, 0.15);'>
-        <p style='text-align: center; color: #9ca3af; font-size: 0.78rem; margin: 0;'>Built with ❤️ by</p>
-        <p style='text-align: center; color: #d4af37; font-size: 0.9rem; font-weight: 700; margin: 2px 0;'>Mohamed Gomaa</p>
-        <p style='text-align: center; color: #6b7280; font-size: 0.72rem; margin: 0;'>Data Analyst & Software Engineer</p>
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style="text-align:center; font-size:0.82rem; color:#94a3b8; padding-top:8px;">
+            Built with ❤️ by <strong style="color:#e5c158;">Mohamed Gomaa</strong><br>
+            <span style="font-size:0.75rem;">Data Analyst & Software Engineer</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ==========================================
+# 4. الترويسة الرئيسية
+# ==========================================
+st.markdown(
+    """
+    <div style="text-align:center;">
+        <div class="hero-badge">🏆 Engineered & Designed by Mohamed Gomaa</div>
+        <h1 class="hero-title">📊 لوحة تحليل البيانات الذكية</h1>
+        <p class="hero-subtitle">ارفع بياناتك، نظّفها بضغطة زر، استشرف التوقعات، وأصدر تقارير تنفيذية متكاملة</p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-# 4. المساحة الرئيسية
-st.markdown("""
-<div style='text-align: center; padding: 10px 0 20px 0;'>
-    <div style='display: inline-block; background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 20px; padding: 5px 16px; margin-bottom: 12px; direction: ltr;'>
-        <span style='color: #d4af37; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px;'>
-            👨‍💻 Engineered & Designed by <a href="https://github.com/MohamedGomaa11111" target="_blank" style="color: #f3d06b; text-decoration: none; font-weight: 700;">Mohamed Gomaa</a>
-        </span>
-    </div>
-    <h1 style='text-align: center; color: #d4af37; font-size: 2.5rem; margin-bottom: 5px;'>📊 لوحة تحليل البيانات الذكية</h1>
-    <p style='text-align: center; color: #9ca3af; font-size: 1.05rem;'>ارفع بياناتك، نظّفها بضغطة زر، استشرف التوقعات، وأصدر تقارير تنفيذية متكاملة</p>
-</div>
-""", unsafe_allow_html=True)
+if st.session_state.df is None:
+    st.markdown(
+        """
+        <div style="background:#0d1426; border:1px dashed #c9a227; border-radius:14px; padding:36px; text-align:center; margin-top:20px;">
+            <h3 style="color:#e5c158; margin-bottom:10px;">👋 أهلاً بك في مساحة العمل الذكية</h3>
+            <p style="color:#cbd5e1; font-size:1rem;">
+                ابدأ برفع ملف البيانات (CSV أو Excel) أو اضغط على زر <strong>🚀 جرب ببيانات مبيعات جاهزة</strong> من القائمة الجانبية لتفعيل التنظيف، المحاكاة، والتقرير التنفيذي الذكي.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.stop()
 
-if uploaded_file is not None or "df" in st.session_state:
-    if uploaded_file is not None and ("current_file" not in st.session_state or st.session_state.current_file != uploaded_file.name):
-        if uploaded_file.name.endswith('.csv'):
-            raw_df = pd.read_csv(uploaded_file)
-        else:
-            raw_df = pd.read_excel(uploaded_file)
-        st.session_state.current_file = uploaded_file.name
-        st.session_state.raw_df = raw_df.copy()
-        st.session_state.df = raw_df.copy()
-        st.session_state.cleaning_log = ["تم تحميل الملف الأصلي بنجاح"]
-        st.session_state.last_report = None
-        st.session_state.exec_report_md = None
+df = st.session_state.df
+health_score, dup_rows, missing_vals = calculate_health_score(df)
 
-    active_file_name = uploaded_file.name if uploaded_file is not None else st.session_state.get("current_file", "Sample_Sales_Data.xlsx")
-    df = st.session_state.df
-    health_score = calculate_health_score(df)
+# ==========================================
+# 5. بطاقات مؤشرات الجودة (5 KPI Cards)
+# ==========================================
+c1, c2, c3, c4, c5 = st.columns(5)
+with c1:
+    st.markdown(f'<div class="kpi-card"><div class="kpi-label">إجمالي الصفوف</div><div class="kpi-value">{len(df):,}</div></div>', unsafe_allow_html=True)
+with c2:
+    st.markdown(f'<div class="kpi-card"><div class="kpi-label">عدد الأعمدة</div><div class="kpi-value">{df.shape[1]}</div></div>', unsafe_allow_html=True)
+with c3:
+    st.markdown(f'<div class="kpi-card"><div class="kpi-label">القيم المفقودة</div><div class="kpi-value">{missing_vals:,}</div></div>', unsafe_allow_html=True)
+with c4:
+    st.markdown(f'<div class="kpi-card"><div class="kpi-label">الصفوف المكررة</div><div class="kpi-value">{dup_rows:,}</div></div>', unsafe_allow_html=True)
+with c5:
+    st.markdown(f'<div class="kpi-card"><div class="kpi-label">جودة البيانات</div><div class="kpi-value">{health_score}%</div></div>', unsafe_allow_html=True)
 
-    # كروت الملخص السريع + مؤشر جودة البيانات
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("إجمالي الصفوف", f"{df.shape[0]:,}")
-    c2.metric("عدد الأعمدة", df.shape[1])
-    c3.metric("القيم المفقودة", f"{df.isnull().sum().sum():,}")
-    c4.metric("الصفوف المكررة", f"{df.duplicated().sum():,}")
-    c5.metric("جودة البيانات", f"{health_score}%")
-    
-    st.progress(health_score / 100)
-    st.write("")
-    
-    tab1, tab2, tab3, tab4 = st.tabs([
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ==========================================
+# 6. التبويبات الرئيسية الأربعة
+# ==========================================
+tab1, tab2, tab3, tab4 = st.tabs(
+    [
         "🧹 معاينة وتنظيف البيانات",
         "📈 التحليل الاستكشافي (EDA)",
         "🔮 التنبؤ ومحاكاة السيناريوهات",
-        "🤖 الذكاء الاصطناعي والتقرير التنفيذي"
-    ])
-    
-    # ==================== TAB 1: التنظيف ====================
-    with tab1:
-        if st.session_state.get("last_report"):
-            st.success(f"**📋 تقرير المعالجة الأخيرة:** {st.session_state.last_report}")
+        "🤖 الذكاء الاصطناعي والتقرير التنفيذي",
+    ]
+)
 
-        st.subheader("🛠️ أدوات التنظيف الاحترافي")
-        
-        top_btn1, top_btn2 = st.columns([2, 1])
-        with top_btn1:
-            if st.button("⚡ التنظيف الذكي الشامل (Auto-Clean All)", type="primary", use_container_width=True):
-                temp_df = st.session_state.df.copy()
-                report_details = []
+# ------------------------------------------
+# التبويب الأول: معاينة وتنظيف البيانات
+# ------------------------------------------
+with tab1:
+    if st.session_state.clean_logs:
+        st.markdown(
+            f'<div class="callout-box">📋 تقرير المعالجة الأخيرة: {st.session_state.clean_logs[-1]}</div>',
+            unsafe_allow_html=True,
+        )
 
-                temp_df, hidden_nulls = normalize_hidden_nulls(temp_df)
-                if hidden_nulls > 0:
-                    report_details.append(f"اكتشاف {hidden_nulls} قيمة فارغة مخفية")
+    st.markdown('<div class="section-header">🛠️ أدوات التنظيف الاحترافي</div>', unsafe_allow_html=True)
 
-                cols_before_all = temp_df.shape[1]
-                rows_before_all = temp_df.shape[0]
-                temp_df = temp_df.dropna(axis=1, how='all').dropna(axis=0, how='all').reset_index(drop=True)
-                if temp_df.shape[1] < cols_before_all:
-                    report_details.append(f"حذف {cols_before_all - temp_df.shape[1]} أعمدة فارغة تماماً")
-                if temp_df.shape[0] < rows_before_all:
-                    report_details.append(f"حذف {rows_before_all - temp_df.shape[0]} صفوف فارغة تماماً")
-
-                if len(temp_df) > 0:
-                    cols_before_sparse = temp_df.shape[1]
-                    min_valid = max(2, int(len(temp_df) * 0.25))
-                    temp_df = temp_df.dropna(axis=1, thresh=min_valid)
-                    if temp_df.shape[1] < cols_before_sparse:
-                        report_details.append(f"حذف {cols_before_sparse - temp_df.shape[1]} أعمدة جانبية مهملة")
-
-                temp_df, header_promoted = promote_header_if_needed(temp_df)
-                if header_promoted:
-                    report_details.append("اكتشاف صف العناوين وتعيينه كـ Header تلقائياً")
-
-                rows_before_na = len(temp_df)
-                temp_df = temp_df.dropna(how='any').reset_index(drop=True)
-                if len(temp_df) < rows_before_na:
-                    report_details.append(f"حذف {rows_before_na - len(temp_df)} صفوف ناقصة")
-
-                temp_df, cols_changed = standardize_col_names(temp_df)
-                if cols_changed > 0:
-                    report_details.append(f"توحيد {cols_changed} اسم عمود")
-
-                before_dup = len(temp_df)
-                temp_df = temp_df.drop_duplicates().reset_index(drop=True)
-                removed_dup = before_dup - len(temp_df)
-                if removed_dup > 0:
-                    report_details.append(f"حذف {removed_dup} صف مكرر")
-
-                text_cols_cleaned = 0
-                for col in temp_df.select_dtypes(include=['object']).columns:
-                    orig_col = temp_df[col].copy()
-                    temp_df[col] = temp_df[col].apply(lambda x: x.strip().title() if isinstance(x, str) else x)
-                    if not orig_col.equals(temp_df[col]):
-                        text_cols_cleaned += 1
-                if text_cols_cleaned > 0:
-                    report_details.append(f"تنظيف النصوص في {text_cols_cleaned} عمود")
-
-                temp_df, fixed_types = smart_fix_types(temp_df)
-                if fixed_types:
-                    report_details.append(f"تحويل الأنواع: {', '.join(fixed_types)}")
-
-                st.session_state.df = temp_df
-                summary_msg = " | ".join(report_details) if report_details else "البيانات نظيفة بالفعل ولا توجد أخطاء شكلية!"
-                log_action(f"تنظيف ذكي شامل: {summary_msg}")
-                st.rerun()
-
-        with top_btn2:
-            if st.button("🔄 استرجاع البيانات الأصلية", use_container_width=True):
+    col_a, col_b = st.columns([2, 1])
+    with col_a:
+        if st.button("⚡ التنظيف الذكي الشامل (Auto-Clean All)", type="primary", use_container_width=True):
+            cleaned_df, logs = auto_clean_dataframe(st.session_state.df)
+            st.session_state.df = cleaned_df
+            st.session_state.clean_logs.extend(logs)
+            st.rerun()
+    with col_b:
+        if st.button("🔄 استرجاع البيانات الأصلية", use_container_width=True):
+            if st.session_state.raw_df is not None:
                 st.session_state.df = st.session_state.raw_df.copy()
-                st.session_state.cleaning_log = ["تمت استعادة النسخة الأصلية للملف"]
-                st.session_state.last_report = "تمت استعادة البيانات الأصلية بنجاح."
+                st.session_state.clean_logs = ["تم استرجاع النسخة الأصلية من البيانات."]
                 st.rerun()
 
-        st.write("")
+    b1, b2, b3, b4 = st.columns(4)
+    with b1:
+        if st.button("🗑️ حذف المكرر", use_container_width=True):
+            before = len(st.session_state.df)
+            st.session_state.df = st.session_state.df.drop_duplicates().reset_index(drop=True)
+            removed = before - len(st.session_state.df)
+            st.session_state.clean_logs.append(f"تم حذف {removed} صف مكرر يدوياً.")
+            st.rerun()
+    with b2:
+        if st.button("✨ توحيد النصوص", use_container_width=True):
+            for col in st.session_state.df.select_dtypes(include="object").columns:
+                st.session_state.df[col] = st.session_state.df[col].astype(str).str.strip()
+            st.session_state.clean_logs.append("تم تنظيف وتوحيد المسافات في جميع الأعمدة النصية.")
+            st.rerun()
+    with b3:
+        if st.button("🔢 تصحيح الأنواع", use_container_width=True):
+            cleaned_df, logs = auto_clean_dataframe(st.session_state.df)
+            st.session_state.df = cleaned_df
+            st.session_state.clean_logs.append("تم فحص وتصحيح أنواع البيانات.")
+            st.rerun()
+    with b4:
+        if st.button("🏷️ توحيد أسماء الأعمدة", use_container_width=True):
+            st.session_state.df.columns = [
+                re.sub(r"\s+", "_", str(c).strip().lower()) for c in st.session_state.df.columns
+            ]
+            st.session_state.clean_logs.append("تم توحيد أسماء الأعمدة.")
+            st.rerun()
 
-        col_clean1, col_clean2, col_clean3, col_clean4 = st.columns(4)
-        with col_clean1:
-            if st.button("🗑️ حذف المكرر", use_container_width=True):
-                before = len(st.session_state.df)
-                st.session_state.df = st.session_state.df.drop_duplicates().reset_index(drop=True)
-                removed = before - len(st.session_state.df)
-                log_action(f"حذف {removed} صف مكرر وإعادة ترتيب الفهرس")
-                st.rerun()
-
-        with col_clean2:
-            if st.button("✨ توحيد النصوص", use_container_width=True):
-                temp_df, hidden = normalize_hidden_nulls(st.session_state.df)
-                for col in temp_df.select_dtypes(include=['object']).columns:
-                    temp_df[col] = temp_df[col].apply(lambda x: x.strip().title() if isinstance(x, str) else x)
-                st.session_state.df = temp_df
-                log_action(f"تنظيف المسافات وتوحيد النصوص (واكتشاف {hidden} قيمة فارغة مخفية)")
-                st.rerun()
-
-        with col_clean3:
-            if st.button("🔢 تصحيح الأنواع", use_container_width=True):
-                st.session_state.df, fixed = smart_fix_types(st.session_state.df)
-                msg = f"تم تحويل: {', '.join(fixed)}" if fixed else "جميع أنواع الأعمدة صحيحة بالفعل"
-                log_action(msg)
-                st.rerun()
-
-        with col_clean4:
-            if st.button("🏷️ توحيد أسماء الأعمدة", use_container_width=True):
-                st.session_state.df, changed = standardize_col_names(st.session_state.df)
-                log_action(f"توحيد {changed} اسم عمود لصيغة snake_case")
-                st.rerun()
-
-        st.write("")
-
-        adv_col1, adv_col2 = st.columns(2)
-        with adv_col1:
-            with st.expander("🩹 معالجة القيم المفقودة (Missing Values)", expanded=False):
-                missing_method = st.selectbox(
-                    "اختر طريقة المعالجة:",
-                    [
-                        "حذف الصفوف التي تحتوي على قيم فارغة (Drop Rows)",
-                        "تعويض الأرقام بالمتوسط (Mean) والنصوص بالأكثر تكراراً (Mode)",
-                        "تعويض الأرقام بالوسيط (Median) والنصوص بالأكثر تكراراً (Mode)"
-                    ]
-                )
-                if st.button("تطبيق معالجة القيم الفارغة", use_container_width=True):
-                    temp_df, _ = normalize_hidden_nulls(st.session_state.df)
-                    nulls_before = temp_df.isnull().sum().sum()
-                    if nulls_before == 0:
-                        log_action("فحص القيم المفقودة: لا توجد أي قيم فارغة في الجدول")
-                    elif "حذف" in missing_method:
-                        rows_before = len(temp_df)
-                        temp_df = temp_df.dropna().reset_index(drop=True)
-                        log_action(f"حذف {rows_before - len(temp_df)} صف يحتوي على قيم مفقودة")
+    exp1, exp2 = st.columns(2)
+    with exp1:
+        with st.expander("🩹 معالجة القيم المفقودة (Missing Values)"):
+            null_cols = [c for c in df.columns if df[c].isna().sum() > 0]
+            if not null_cols:
+                st.success("لا توجد أي قيم مفقودة في الجدول حالياً.")
+            else:
+                target_null_col = st.selectbox("اختر العمود:", null_cols)
+                method = st.radio("طريقة المعالجة:", ["التعويض بالمتوسط/الوسيط", "حذف الصفوف الفارغة"], horizontal=True)
+                if st.button("تطبيق على القيم المفقودة"):
+                    if method == "حذف الصفوف الفارغة":
+                        st.session_state.df = st.session_state.df.dropna(subset=[target_null_col]).reset_index(drop=True)
                     else:
-                        for col in temp_df.columns:
-                            if temp_df[col].isnull().sum() > 0:
-                                if pd.api.types.is_numeric_dtype(temp_df[col]):
-                                    fill_val = temp_df[col].mean() if "Mean" in missing_method else temp_df[col].median()
-                                    temp_df[col] = temp_df[col].fillna(fill_val)
-                                else:
-                                    mode_val = temp_df[col].mode()[0] if not temp_df[col].mode().empty else "Unknown"
-                                    temp_df[col] = temp_df[col].fillna(mode_val)
-                        log_action(f"تعويض {nulls_before} خلية فارغة باستخدام ({missing_method.split('(')[1].split(')')[0]})")
-                    st.session_state.df = temp_df
+                        if pd.api.types.is_numeric_dtype(st.session_state.df[target_null_col]):
+                            st.session_state.df[target_null_col] = st.session_state.df[target_null_col].fillna(
+                                st.session_state.df[target_null_col].median()
+                            )
+                        else:
+                            st.session_state.df[target_null_col] = st.session_state.df[target_null_col].fillna("غير محدد")
+                    st.session_state.clean_logs.append(f"تمت معالجة القيم المفقودة في عمود {target_null_col}.")
                     st.rerun()
 
-        with adv_col2:
-            with st.expander("✂️ حذف الأعمدة غير المفيدة (Drop Columns)", expanded=False):
-                cols_to_drop = st.multiselect(
-                    "اختر الأعمدة التي تريد حذفها:",
-                    options=st.session_state.df.columns.tolist()
-                )
-                if st.button("حذف الأعمدة المحددة", use_container_width=True):
-                    if cols_to_drop:
-                        st.session_state.df = st.session_state.df.drop(columns=cols_to_drop)
-                        log_action(f"حذف الأعمدة: {', '.join(cols_to_drop)}")
-                        st.rerun()
-                    else:
-                        st.warning("اختر عموداً واحداً على الأقل أولاً.")
-
-        adv_col3, adv_col4 = st.columns(2)
-        with adv_col3:
-            with st.expander("🎯 معالجة القيم الشاذة (Outliers - IQR)", expanded=False):
-                num_cols_out = st.session_state.df.select_dtypes(include=['number']).columns.tolist()
-                if num_cols_out:
-                    target_num_col = st.selectbox("اختر العمود الرقمي:", num_cols_out, key="outlier_col")
-                    Q1 = st.session_state.df[target_num_col].quantile(0.25)
-                    Q3 = st.session_state.df[target_num_col].quantile(0.75)
-                    IQR = Q3 - Q1
-                    lower_bound = Q1 - 1.5 * IQR
-                    upper_bound = Q3 + 1.5 * IQR
-                    outliers_count = ((st.session_state.df[target_num_col] < lower_bound) | (st.session_state.df[target_num_col] > upper_bound)).sum()
-                    
-                    st.caption(f"عدد القيم الشاذة المكتشفة في ({target_num_col}): **{outliers_count}**")
-                    outlier_action = st.radio("الإجراء:", ["حصر القيم عند الحدود الطبيعية (Capping)", "حذف الصفوف الشاذة (Remove)"], horizontal=True)
-                    
-                    if st.button("تطبيق معالجة القيم الشاذة", use_container_width=True):
-                        temp_df = st.session_state.df.copy()
-                        if outliers_count == 0:
-                            log_action(f"فحص القيم الشاذة في ({target_num_col}): لا توجد قيم شاذة")
-                        elif "Capping" in outlier_action:
-                            temp_df[target_num_col] = np.clip(temp_df[target_num_col], lower_bound, upper_bound)
-                            log_action(f"حصر {outliers_count} قيمة شاذة في عمود ({target_num_col}) عند [{lower_bound:.1f}, {upper_bound:.1f}]")
-                        else:
-                            temp_df = temp_df[(temp_df[target_num_col] >= lower_bound) & (temp_df[target_num_col] <= upper_bound)].reset_index(drop=True)
-                            log_action(f"حذف {outliers_count} صف شاذ من عمود ({target_num_col})")
-                        st.session_state.df = temp_df
-                        st.rerun()
-                else:
-                    st.info("لا توجد أعمدة رقمية لفحص القيم الشاذة.")
-
-        with adv_col4:
-            with st.expander("🔄 البحث والاستبدال (Find & Replace)", expanded=False):
-                rep_col = st.selectbox("اختر العمود:", st.session_state.df.columns.tolist(), key="rep_col")
-                c_find, c_rep = st.columns(2)
-                find_val = c_find.text_input("القيمة القديمة:")
-                replace_val = c_rep.text_input("القيمة الجديدة:")
-                if st.button("تنفيذ الاستبدال", use_container_width=True):
-                    if find_val != "":
-                        temp_df = st.session_state.df.copy()
-                        if pd.api.types.is_numeric_dtype(temp_df[rep_col]):
-                            try:
-                                f_v, r_v = float(find_val), float(replace_val)
-                                count_rep = (temp_df[rep_col] == f_v).sum()
-                                temp_df[rep_col] = temp_df[rep_col].replace(f_v, r_v)
-                                st.session_state.df = temp_df
-                                log_action(f"استبدال {count_rep} خلية من ({find_val}) إلى ({replace_val}) في عمود {rep_col}")
-                                st.rerun()
-                            except ValueError:
-                                st.error("العمود رقمي، أدخل أرقاماً صحيحة.")
-                        else:
-                            count_rep = (temp_df[rep_col].astype(str) == find_val).sum()
-                            temp_df[rep_col] = temp_df[rep_col].astype(str).replace(find_val, replace_val)
-                            st.session_state.df = temp_df
-                            log_action(f"استبدال {count_rep} خلية من ('{find_val}') إلى ('{replace_val}') في عمود {rep_col}")
-                            st.rerun()
-
-        st.divider()
-        
-        head_col1, head_col2 = st.columns([3, 1])
-        with head_col1:
-            st.subheader("📋 جدول البيانات بعد التحديث")
-        with head_col2:
-            csv_data = st.session_state.df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 تحميل الداتا النظيفة (CSV)",
-                data=csv_data,
-                file_name=f"cleaned_{active_file_name.split('.')[0]}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-            
-        st.dataframe(st.session_state.df, use_container_width=True, height=350)
-        
-    # ==================== TAB 2: التحليل الاستكشافي ====================
-    with tab2:
-        st.subheader("🔍 فحص هيكل البيانات (Data Schema)")
-        schema_df = pd.DataFrame({
-            "اسم العمود": df.columns,
-            "نوع البيانات": df.dtypes.astype(str),
-            "القيم الفريدة (Unique)": df.nunique().values,
-            "القيم المفقودة": df.isnull().sum().values
-        })
-        st.dataframe(schema_df, use_container_width=True, hide_index=True)
-
-        st.divider()
-        st.subheader("📊 الإحصائيات الوصفية (Descriptive Statistics)")
-        
-        num_cols = df.select_dtypes(include=['number']).columns.tolist()
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        date_cols = df.select_dtypes(include=['datetime']).columns.tolist()
-
-        stat_col1, stat_col2 = st.columns(2)
-        with stat_col1:
-            st.markdown("**الأعمدة الرقمية:**")
+        with st.expander("🎯 معالجة القيم الشاذة (Outliers - IQR)"):
+            num_cols = df.select_dtypes(include=np.number).columns.tolist()
             if num_cols:
-                st.dataframe(df[num_cols].describe().T, use_container_width=True)
-            else:
-                st.info("لا توجد أعمدة رقمية في هذا الملف.")
+                out_col = st.selectbox("اختر العمود الرقمي:", num_cols, key="iqr_col")
+                if st.button("ضبط القيم الشاذة (Winsorize IQR)"):
+                    q1 = st.session_state.df[out_col].quantile(0.25)
+                    q3 = st.session_state.df[out_col].quantile(0.75)
+                    iqr = q3 - q1
+                    low, high = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+                    st.session_state.df[out_col] = np.clip(st.session_state.df[out_col], low, high)
+                    st.session_state.clean_logs.append(f"تم ضبط القيم الشاذة في ({out_col}) باستخدام IQR.")
+                    st.rerun()
 
-        with stat_col2:
-            st.markdown("**الأعمدة النصية / التصنيفية:**")
-            if cat_cols:
-                st.dataframe(df[cat_cols].astype(str).describe().T, use_container_width=True)
-            else:
-                st.info("لا توجد أعمدة نصية في هذا الملف.")
+    with exp2:
+        with st.expander("✂️ حذف الأعمدة غير المفيدة (Drop Columns)"):
+            cols_to_drop = st.multiselect("حدد الأعمدة المراد حذفها:", df.columns.tolist())
+            if st.button("حذف الأعمدة المحددة") and cols_to_drop:
+                st.session_state.df = st.session_state.df.drop(columns=cols_to_drop)
+                st.session_state.clean_logs.append(f"تم حذف الأعمدة: {', '.join(cols_to_drop)}")
+                st.rerun()
 
-        st.divider()
-        st.subheader("📈 استكشاف التوزيعات والعلاقات تلقائياً")
-
-        useful_num_cols = [c for c in num_cols if not any(k in c.lower() for k in ['id', 'code', 'zip', 'phone'])] or num_cols
-        useful_cat_cols = [c for c in cat_cols if not any(k in c.lower() for k in ['id', 'code', 'sku', 'serial']) and df[c].nunique() < len(df) * 0.8] or cat_cols
-
-        viz_col1, viz_col2 = st.columns(2)
-        with viz_col1:
-            if useful_num_cols:
-                selected_num = st.selectbox("اختر عمود رقمي لعرض توزيعه:", useful_num_cols)
-                fig_hist = px.histogram(
-                    df, x=selected_num, marginal="box",
-                    title=f"توزيع قيم: {selected_num}",
-                    template="plotly_dark",
-                    color_discrete_sequence=["#d4af37"]
+        with st.expander("🔍 البحث والاستبدال (Find & Replace)"):
+            rep_col = st.selectbox("العمود المستهدف:", df.columns.tolist(), key="rep_col")
+            old_val = st.text_input("القيمة القديمة:")
+            new_val = st.text_input("القيمة الجديدة:")
+            if st.button("تنفيذ الاستبدال") and old_val:
+                st.session_state.df[rep_col] = (
+                    st.session_state.df[rep_col].astype(str).replace(old_val, new_val)
                 )
-                fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_hist, use_container_width=True)
+                st.session_state.clean_logs.append(f"تم استبدال ({old_val}) بـ ({new_val}) في {rep_col}.")
+                st.rerun()
 
-        with viz_col2:
-            if useful_cat_cols:
-                selected_cat = st.selectbox("اختر عمود تصنيفي لعرض أعلى الفئات:", useful_cat_cols)
-                top_cats = df[selected_cat].value_counts().head(10).reset_index()
-                top_cats.columns = [selected_cat, "العدد"]
-                fig_bar = px.bar(
-                    top_cats, x=selected_cat, y="العدد",
-                    title=f"أعلى الفئات تكراراً في: {selected_cat}",
-                    template="plotly_dark",
-                    color_discrete_sequence=["#38bdf8"]
-                )
-                fig_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_bar, use_container_width=True)
+    st.markdown('<div class="section-header">📋 جدول البيانات بعد التحديث</div>', unsafe_allow_html=True)
+    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        label="📥 تحميل الداتا النظيفة (CSV)",
+        data=csv_bytes,
+        file_name="cleaned_dataset.csv",
+        mime="text/csv",
+    )
+    st.dataframe(df, use_container_width=True, height=340)
 
-        if date_cols and useful_num_cols:
-            st.subheader("📅 تحليل الاتجاه الزمني (Time Series)")
-            ts_col1, ts_col2 = st.columns(2)
-            selected_date = ts_col1.selectbox("عمود التاريخ:", date_cols)
-            selected_ts_num = ts_col2.selectbox("المتغير الرقمي:", useful_num_cols, key="ts_num")
-            
-            ts_df = df.groupby(selected_date)[selected_ts_num].sum().reset_index()
-            fig_line = px.line(
-                ts_df, x=selected_date, y=selected_ts_num, markers=True,
-                title=f"تطور {selected_ts_num} عبر {selected_date}",
-                template="plotly_dark",
-                color_discrete_sequence=["#10b981"]
+
+# ------------------------------------------
+# التبويب الثاني: التحليل الاستكشافي (EDA)
+# ------------------------------------------
+with tab2:
+    st.markdown('<div class="section-header">🔍 فحص هيكل البيانات (Data Schema)</div>', unsafe_allow_html=True)
+    schema_df = pd.DataFrame(
+        {
+            "اسم العمود": df.columns,
+            "نوع البيانات": [str(dtype) for dtype in df.dtypes],
+            "القيم الفريدة (Unique)": [df[col].nunique() for col in df.columns],
+            "القيم المفقودة": [int(df[col].isna().sum()) for col in df.columns],
+        }
+    )
+    st.dataframe(schema_df, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="section-header">📊 الإحصائيات الوصفية (Descriptive Statistics)</div>', unsafe_allow_html=True)
+    stat_c1, stat_c2 = st.columns(2)
+    num_df = df.select_dtypes(include=np.number)
+    cat_df = df.select_dtypes(exclude=[np.number, "datetime64[ns]", "datetime64[us]"])
+
+    with stat_c1:
+        st.caption("الأعمدة الرقمية:")
+        if not num_df.empty:
+            st.dataframe(num_df.describe().T, use_container_width=True)
+        else:
+            st.info("لا توجد أعمدة رقمية.")
+
+    with stat_c2:
+        st.caption("الأعمدة النصية / التصنيفية:")
+        if not cat_df.empty:
+            st.dataframe(cat_df.describe().T, use_container_width=True)
+        else:
+            st.info("لا توجد أعمدة تصنيفية.")
+
+    st.markdown('<div class="section-header">📉 استكشاف التوزيعات والعلاقات تلقائياً</div>', unsafe_allow_html=True)
+    d1, d2 = st.columns(2)
+    with d1:
+        if not num_df.empty:
+            sel_num = st.selectbox("اختر عمود رقمي لعرض توزيعه:", num_df.columns, key="eda_num")
+            fig_box = px.box(
+                df,
+                x=sel_num,
+                color_discrete_sequence=["#e5c158"],
+                orientation="h",
             )
-            fig_line.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig_line, use_container_width=True)
+            st.plotly_chart(style_plotly_fig(fig_box, f"توزيع قيم {sel_num}"), use_container_width=True)
 
-        if len(useful_num_cols) >= 2:
-            st.subheader("🔥 مصفوفة الارتباط (Correlation Heatmap)")
-            corr_matrix = df[useful_num_cols].corr()
-            fig_corr = px.imshow(
-                corr_matrix, text_auto=".2f", aspect="auto",
-                color_continuous_scale="RdBu_r",
-                template="plotly_dark",
-                title="قوة الارتباط بين المتغيرات الرقمية"
+    with d2:
+        if not cat_df.empty:
+            sel_cat = st.selectbox("اختر عمود تصنيفي لعرض أعلى الفئات:", cat_df.columns, key="eda_cat")
+            top_counts = df[sel_cat].value_counts().head(10).reset_index()
+            top_counts.columns = [sel_cat, "العدد"]
+            fig_bar = px.bar(
+                top_counts,
+                x="العدد",
+                y=sel_cat,
+                orientation="h",
+                color_discrete_sequence=["#38bdf8"],
             )
-            fig_corr.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(style_plotly_fig(fig_bar, f"أعلى الفئات تكراراً في {sel_cat}"), use_container_width=True)
 
-    # ==================== TAB 3: التنبؤ ومحاكاة السيناريوهات ====================
-    with tab3:
-        st.subheader("🎛️ محاكي السيناريوهات واتخاذ القرار (What-If Decision Simulator)")
-        st.caption("اختبر تأثير التغييرات المستقبلية (زيادة المبيعات، خفض التكاليف أو الهدر) على إجمالي الأداء فوراً.")
+    # تحليل الاتجاه الزمني مع تجميع ذكي للبيانات الكثيفة
+    date_cols = [
+        c for c in df.columns
+        if pd.api.types.is_datetime64_any_dtype(df[c]) or any(k in c.lower() for k in ["date", "time", "تاريخ"])
+    ]
+    if date_cols and not num_df.empty:
+        st.markdown('<div class="section-header">⏳ تحليل الاتجاه الزمني (Time Series)</div>', unsafe_allow_html=True)
+        ts_c1, ts_c2, ts_c3 = st.columns(3)
+        with ts_c1:
+            ts_date = st.selectbox("عمود التاريخ:", date_cols, key="ts_date")
+        with ts_c2:
+            ts_val = st.selectbox("المتغير الرقمي:", num_df.columns, key="ts_val")
+        with ts_c3:
+            ts_freq = st.selectbox(
+                "مستوى التجميع الزمني:",
+                ["تلقائي (ذكي)", "يومي (Daily)", "أسبوعي (Weekly)", "شهري (Monthly)"],
+                key="ts_freq",
+            )
 
-        sim_num_cols = [c for c in df.select_dtypes(include=['number']).columns if not any(k in c.lower() for k in ['id', 'code', 'zip', 'phone'])]
-        if sim_num_cols:
-            sc1, sc2, sc3 = st.columns(3)
-            with sc1:
-                target_metric = st.selectbox("اختر المؤشر الرئيسي (مثل المبيعات / الإيرادات):", sim_num_cols, key="sim_metric")
-            with sc2:
-                growth_pct = st.slider("نسبة التغير المتوقعة في المؤشر (%):", min_value=-50, max_value=100, value=15, step=5)
-            with sc3:
-                cost_ratio = st.slider("نسبة التكاليف / الهدر التقديرية (%):", min_value=0, max_value=90, value=30, step=5)
+        ts_temp = df[[ts_date, ts_val]].copy()
+        ts_temp[ts_date] = pd.to_datetime(ts_temp[ts_date], errors="coerce")
+        ts_temp = ts_temp.dropna().sort_values(ts_date)
 
-            current_total = float(df[target_metric].sum())
-            projected_total = current_total * (1 + growth_pct / 100.0)
-            current_net = current_total * (1 - cost_ratio / 100.0)
-            projected_net = projected_total * (1 - cost_ratio / 100.0)
+        if not ts_temp.empty:
+            unique_days = ts_temp[ts_date].nunique()
+            if ts_freq == "تلقائي (ذكي)":
+                rule = "ME" if unique_days > 180 else ("W" if unique_days > 45 else "D")
+            elif ts_freq == "شهري (Monthly)":
+                rule = "ME"
+            elif ts_freq == "أسبوعي (Weekly)":
+                rule = "W"
+            else:
+                rule = "D"
 
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("الإجمالي الحالي", f"{current_total:,.2f}")
-            m2.metric("الإجمالي المتوقع (بعد السيناريو)", f"{projected_total:,.2f}", delta=f"{growth_pct:+d}%")
-            m3.metric("صافي العائد الحالي", f"{current_net:,.2f}")
-            m4.metric("صافي العائد المتوقع", f"{projected_net:,.2f}", delta=f"{(projected_net - current_net):+,.2f}")
+            ts_grouped = ts_temp.set_index(ts_date)[ts_val].resample(rule).sum().reset_index()
+            fig_ts = px.line(
+                ts_grouped,
+                x=ts_date,
+                y=ts_val,
+                markers=True,
+                color_discrete_sequence=["#10b981"],
+            )
+            fig_ts.update_traces(line=dict(width=2.8), marker=dict(size=6))
+            st.plotly_chart(style_plotly_fig(fig_ts, f"تطور {ts_val} عبر {ts_date}"), use_container_width=True)
 
-            sim_chart_df = pd.DataFrame({
+    if num_df.shape[1] >= 2:
+        st.markdown('<div class="section-header">🔥 مصفوفة الارتباط (Correlation Heatmap)</div>', unsafe_allow_html=True)
+        corr = num_df.corr().round(2)
+        fig_corr = px.imshow(
+            corr,
+            text_auto=True,
+            color_continuous_scale="RdBu_r",
+            aspect="auto",
+        )
+        st.plotly_chart(style_plotly_fig(fig_corr, "مصفوفة الارتباط بين المتغيرات الرقمية"), use_container_width=True)
+
+
+# ------------------------------------------
+# التبويب الثالث: التنبؤ ومحاكاة السيناريوهات
+# ------------------------------------------
+with tab3:
+    st.markdown('<div class="section-header">🎛️ محاكي السيناريوهات واتخاذ القرار (What-If Decision Simulator)</div>', unsafe_allow_html=True)
+    st.caption("اختبر تأثير التغييرات المستقبلية (زيادة المبيعات، خفض التكاليف أو الهدر) على إجمالي الأداء فوراً.")
+
+    num_cols_sim = df.select_dtypes(include=np.number).columns.tolist()
+    if num_cols_sim:
+        s1, s2, s3 = st.columns(3)
+        with s1:
+            sim_metric = st.selectbox("اختر المؤشر الرئيسي (مثل المبيعات / الإيرادات):", num_cols_sim)
+        with s2:
+            growth_pct = st.slider("نسبة النمو المتوقعة في المؤشر (%):", -50, 100, 20, step=5)
+        with s3:
+            cost_save_pct = st.slider("نسبة تحسين الهامش / خفض الهدر (%):", 0, 50, 15, step=5)
+
+        current_total = float(df[sim_metric].sum())
+        projected_total = current_total * (1 + growth_pct / 100.0)
+        current_net = current_total * 0.75
+        projected_net = projected_total * (0.75 + (cost_save_pct / 100.0) * 0.25)
+        net_diff = projected_net - current_net
+
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">الإجمالي الحالي</div><div class="kpi-value">{current_total:,.2f}</div></div>', unsafe_allow_html=True)
+        with m2:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">الإجمالي المتوقع (بعد السيناريو)</div><div class="kpi-value">{projected_total:,.2f}</div><div style="color:#10b981; font-size:0.8rem; font-weight:700;">{growth_pct:+d}%</div></div>', unsafe_allow_html=True)
+        with m3:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">صافي العائد الحالي</div><div class="kpi-value">{current_net:,.2f}</div></div>', unsafe_allow_html=True)
+        with m4:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">صافي العائد المتوقع</div><div class="kpi-value">{projected_net:,.2f}</div><div style="color:#10b981; font-size:0.8rem; font-weight:700;">{net_diff:+,.2f}</div></div>', unsafe_allow_html=True)
+
+        sim_chart_df = pd.DataFrame(
+            {
                 "الحالة": ["الوضع الحالي", "الوضع المتوقع (السيناريو)"],
-                "الإجمالي الكلي": [current_total, projected_total],
-                "صافي العائد": [current_net, projected_net]
-            })
-            fig_sim = go.Figure(data=[
-                go.Bar(name="الإجمالي الكلي", x=sim_chart_df["الحالة"], y=sim_chart_df["الإجمالي الكلي"], marker_color="#d4af37"),
-                go.Bar(name="صافي العائد", x=sim_chart_df["الحالة"], y=sim_chart_df["صافي العائد"], marker_color="#10b981")
-            ])
-            fig_sim.update_layout(
-                barmode="group",
-                title=f"مقارنة الأداء المالي لـ ({target_metric}) عند تغير بنسبة {growth_pct:+d}%",
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=380
+                "الإجمالي": [current_total, projected_total],
+                "صافي العائد": [current_net, projected_net],
+            }
+        )
+        fig_sim = go.Figure(
+            data=[
+                go.Bar(name="الإجمالي", x=sim_chart_df["الحالة"], y=sim_chart_df["الإجمالي"], marker_color="#e5c158"),
+                go.Bar(name="صافي العائد", x=sim_chart_df["الحالة"], y=sim_chart_df["صافي العائد"], marker_color="#10b981"),
+            ]
+        )
+        fig_sim.update_layout(barmode="group")
+        st.plotly_chart(style_plotly_fig(fig_sim, f"مقارنة الأداء المالي ({sim_metric})"), use_container_width=True)
+
+    # ------------------------------------------
+    # التوقع الزمني المستقبلي المحسّن (Smooth Resampled Forecasting)
+    # ------------------------------------------
+    st.markdown('<div class="section-header">📈 التوقع الزمني المستقبلي (Linear Trend Forecasting)</div>', unsafe_allow_html=True)
+    if date_cols and num_cols_sim:
+        f1, f2, f3, f4 = st.columns([1.2, 1.2, 1.2, 1])
+        with f1:
+            fc_date = st.selectbox("عمود التاريخ:", date_cols, key="fc_date")
+        with f2:
+            fc_target = st.selectbox("المتغير المراد توقعه:", num_cols_sim, index=len(num_cols_sim) - 1, key="fc_target")
+        with f3:
+            fc_granularity = st.selectbox(
+                "تجميع الفترات (لتنعيم المنحنى):",
+                ["تلقائي (ذكي)", "أسبوعي (Weekly)", "شهري (Monthly)", "يومي (Daily)"],
+                key="fc_gran",
             )
-            st.plotly_chart(fig_sim, use_container_width=True)
-        else:
-            st.info("يرجى التأكد من وجود أعمدة رقمية صالحة لتفعيل محاكي السيناريوهات.")
+        with f4:
+            n_periods = st.slider("عدد الفترات القادمة:", 3, 15, 7)
 
-        st.divider()
-        st.subheader("📈 التوقع الزمني المستقبلي (Linear Trend Forecasting)")
-        dt_cols = df.select_dtypes(include=['datetime']).columns.tolist()
-        if dt_cols and sim_num_cols:
-            fc1, fc2, fc3 = st.columns(3)
-            f_date_col = fc1.selectbox("عمود التاريخ:", dt_cols, key="fc_date")
-            f_val_col = fc2.selectbox("المتغير المراد توقعه:", sim_num_cols, key="fc_val")
-            periods_ahead = fc3.slider("عدد الفترات المستقبلية للتوقع:", min_value=3, max_value=30, value=7)
+        fc_df = df[[fc_date, fc_target]].copy()
+        fc_df[fc_date] = pd.to_datetime(fc_df[fc_date], errors="coerce")
+        fc_df = fc_df.dropna().sort_values(fc_date)
 
-            ts_grouped = df.groupby(f_date_col)[f_val_col].sum().reset_index().sort_values(f_date_col)
-            if len(ts_grouped) >= 3:
-                ts_grouped["t"] = np.arange(len(ts_grouped))
-                slope, intercept = np.polyfit(ts_grouped["t"], ts_grouped[f_val_col], 1)
-
-                avg_step = ts_grouped[f_date_col].diff().dropna().median()
-                if pd.isna(avg_step) or avg_step == pd.Timedelta(0):
-                    avg_step = pd.Timedelta(days=1)
-
-                last_t = ts_grouped["t"].iloc[-1]
-                last_date = ts_grouped[f_date_col].iloc[-1]
-
-                future_t = np.arange(last_t + 1, last_t + 1 + periods_ahead)
-                future_dates = [last_date + avg_step * i for i in range(1, periods_ahead + 1)]
-                future_preds = np.maximum(0, slope * future_t + intercept)
-
-                fig_fc = go.Figure()
-                fig_fc.add_trace(go.Scatter(
-                    x=ts_grouped[f_date_col], y=ts_grouped[f_val_col],
-                    mode="lines+markers", name="البيانات الفعلية",
-                    line=dict(color="#38bdf8", width=2.5)
-                ))
-                fig_fc.add_trace(go.Scatter(
-                    x=future_dates, y=future_preds,
-                    mode="lines+markers", name="التوقع المستقبلي (Forecast)",
-                    line=dict(color="#d4af37", width=3, dash="dash")
-                ))
-                fig_fc.update_layout(
-                    title=f"التوقع المستقبلي لـ ({f_val_col}) للـ {periods_ahead} فترات القادمة",
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    height=400
-                )
-                st.plotly_chart(fig_fc, use_container_width=True)
-                trend_dir = "تصاعدي 📈" if slope > 0 else ("تنازلي 📉" if slope < 0 else "مستقر ➖")
-                st.info(f"**💡 مؤشر الاتجاه العام:** الاتجاه التاريخي للبيانات **{trend_dir}** بمعدل تغير **{slope:+,.2f}** لكل فترة زمنية، وإجمالي التوقع للفترات القادمة يبلغ **{future_preds.sum():,.2f}**.")
+        if len(fc_df) >= 4:
+            unique_days = fc_df[fc_date].nunique()
+            if fc_granularity == "تلقائي (ذكي)":
+                if unique_days > 150:
+                    freq_code, freq_label, pd_offset = "W", "أسبوع", pd.Timedelta(weeks=1)
+                elif unique_days > 45:
+                    freq_code, freq_label, pd_offset = "W", "أسبوع", pd.Timedelta(weeks=1)
+                else:
+                    freq_code, freq_label, pd_offset = "D", "يوم", pd.Timedelta(days=1)
+            elif fc_granularity == "شهري (Monthly)":
+                freq_code, freq_label, pd_offset = "ME", "شهر", pd.DateOffset(months=1)
+            elif fc_granularity == "أسبوعي (Weekly)":
+                freq_code, freq_label, pd_offset = "W", "أسبوع", pd.Timedelta(weeks=1)
             else:
-                st.warning("تحتاج البيانات إلى 3 نقاط زمنية على الأقل لحساب التوقع المستقبلي.")
+                freq_code, freq_label, pd_offset = "D", "يوم", pd.Timedelta(days=1)
+
+            hist = fc_df.set_index(fc_date)[fc_target].resample(freq_code).sum().reset_index()
+
+            # إزالة آخر فترة غير مكتملة إذا كانت صفراً تماماً
+            if len(hist) > 4 and hist[fc_target].iloc[-1] == 0:
+                hist = hist.iloc[:-1]
+
+            x_idx = np.arange(len(hist))
+            y_vals = hist[fc_target].values.astype(float)
+            slope, intercept = np.polyfit(x_idx, y_vals, 1)
+
+            future_x = np.arange(len(hist), len(hist) + n_periods)
+            future_y = np.maximum(0, slope * future_x + intercept)
+            last_date = hist[fc_date].iloc[-1]
+            future_dates = [last_date + (i + 1) * pd_offset for i in range(n_periods)]
+
+            # ربط آخر نقطة تاريخية بأول نقطة متوقعة ليكون الخط متصلاً بصرياً
+            conn_dates = [last_date] + future_dates
+            conn_vals = [y_vals[-1]] + list(future_y)
+
+            fig_fc = go.Figure()
+            fig_fc.add_trace(
+                go.Scatter(
+                    x=hist[fc_date],
+                    y=hist[fc_target],
+                    mode="lines+markers",
+                    name=f"البيانات التاريخية ({freq_label}ي)",
+                    line=dict(color="#38bdf8", width=2.8, shape="spline", smoothing=0.45),
+                    marker=dict(size=6, color="#38bdf8"),
+                )
+            )
+            fig_fc.add_trace(
+                go.Scatter(
+                    x=conn_dates,
+                    y=conn_vals,
+                    mode="lines+markers",
+                    name=f"التوقع المستقبلي ({n_periods} {freq_label})",
+                    line=dict(color="#e5c158", width=3.2, dash="dash"),
+                    marker=dict(size=8, color="#e5c158", symbol="diamond"),
+                )
+            )
+
+            st.plotly_chart(
+                style_plotly_fig(fig_fc, f"التوقع المستقبلي لـ ({fc_target}) للـ {n_periods} فترات القادمة"),
+                use_container_width=True,
+            )
+
+            trend_word = "تصاعدي 📈" if slope >= 0 else "تنازلي 📉"
+            total_forecast = float(np.sum(future_y))
+            st.markdown(
+                f'<div class="callout-box">💡 مؤشر الاتجاه العام: الاتجاه التاريخي للبيانات <strong>{trend_word}</strong> بمعدل تغير <strong>{slope:+.2f}</strong> لكل {freq_label}، وإجمالي التوقع للفترات القادمة يبلغ <strong>{total_forecast:,.2f}</strong>.</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.info("💡 لتفعيل التوقع الزمني التلقائي، تأكد من وجود عمود تاريخ (Date) في ملفك واضغط على زر (التنظيف الذكي الشامل) لتحويله.")
+            st.warning("البيانات الزمنية غير كافية لبناء نموذج التوقع.")
+    else:
+        st.info("يتطلب التوقع الزمني وجود عمود تاريخ وعمود رقمي واحد على الأقل.")
 
-    # ==================== TAB 4: الذكاء الاصطناعي والتقرير التنفيذي ====================
-    with tab4:
-        st.subheader("📑 مولّد التقرير التنفيذي والاستراتيجية الشاملة (One-Click Executive Report)")
-        st.caption("يقوم النظام بتحليل كامل الملف إحصائياً واستخلاص أعمق الرؤى، المخاطر، وخطة العمل الاستراتيجية في تقرير متكامل قابل للتحميل.")
 
-        if not api_key:
-            st.error("⚠️ لم يتم العثور على مفتاح `GEMINI_API_KEY` في ملف `.streamlit/secrets.toml`.")
-        else:
-            if st.button("🚀 توليد التقرير التنفيذي والاستراتيجية الشاملة الآن", type="primary", use_container_width=True):
-                with st.spinner("🧠 جاري فحص كامل البيانات واستخلاص المؤشرات وبناء التقرير التنفيذي..."):
-                    try:
-                        num_summary = df.describe().to_string() if len(df.select_dtypes(include=['number']).columns) > 0 else "لا توجد أعمدة رقمية"
-                        
-                        corr_insights = []
-                        valid_nums = [c for c in df.select_dtypes(include=['number']).columns if not any(k in c.lower() for k in ['id', 'code'])]
-                        if len(valid_nums) >= 2:
-                            corr_mat = df[valid_nums].corr()
-                            for i in range(len(valid_nums)):
-                                for j in range(i + 1, len(valid_nums)):
-                                    val = corr_mat.iloc[i, j]
-                                    if abs(val) >= 0.4:
-                                        corr_insights.append(f"- ارتباط بين ({valid_nums[i]}) و ({valid_nums[j]}): {val:.2f}")
+# ------------------------------------------
+# التبويب الرابع: الذكاء الاصطناعي والتقرير التنفيذي
+# ------------------------------------------
+with tab4:
+    st.markdown('<div class="section-header">📑 مولّد التقرير التنفيذي والاستراتيجية الشاملة (One-Click Executive Report)</div>', unsafe_allow_html=True)
+    st.caption("يقوم النظام بتحليل كامل الملف إحصائياً واستخلاص أعمق الرؤى، المخاطر، وخطة العمل الاستراتيجية في تقرير متكامل قابل للتحميل.")
 
-                        top_cat_insights = []
-                        valid_cats = [c for c in df.select_dtypes(include=['object', 'category']).columns if df[c].nunique() <= 30]
-                        for c in valid_cats[:4]:
-                            top_val = df[c].value_counts().index[0]
-                            top_pct = (df[c].value_counts().iloc[0] / len(df)) * 100
-                            top_cat_insights.append(f"- في عمود ({c}): الفئة الأعلى هي '{top_val}' بنسبة {top_pct:.1f}%")
+    if st.button("🪄 توليد التقرير التنفيذي والاستراتيجية الشاملة الآن", type="primary", use_container_width=True):
+        with st.spinner("جاري تحليل البيانات وصياغة التقرير التنفيذي بالذكاء الاصطناعي..."):
+            summary_stats = df.describe(include="all").fillna("").to_string()
+            sample_rows = df.head(5).to_string()
+            exec_prompt = f"""
+            أنت مستشار تحليل بيانات واستراتيجية أعمال (Senior BI & Strategy Consultant).
+            حلل ملخص البيانات التالي واكتب تقريراً تنفيذياً احترافياً باللغة العربية (مع المصطلحات الإنجليزية المهمة) منظم في الأقسام التالية:
+            1. الملخص التنفيذي (Executive Summary)
+            2. أبرز الرؤى والأنماط المكتشفة (Key Insights)
+            3. المخاطر ونقاط الضعف المحتملة (Risks & Anomalies)
+            4. خطة العمل والتوصيات الاستراتيجية القابلة للتنفيذ (Actionable Recommendations)
 
-                        report_prompt = f"""
-أنت كبير محللي البيانات ومستشار استراتيجي للأعمال (Chief Data Strategist).
-لديك ملف بيانات باسم: "{active_file_name}"
-- عدد الصفوف: {df.shape[0]:,}
-- عدد الأعمدة: {df.shape[1]}
-- نسبة جودة البيانات: {health_score}%
+            إحصائيات البيانات (عدد الصفوف {len(df)}):
+            {summary_stats[:3500]}
 
-الملخص الإحصائي لكامل البيانات:
-{num_summary}
+            عينة من الصفوف:
+            {sample_rows[:1200]}
+            """
+            report_md = ask_gemini_with_fallback(exec_prompt)
+            st.session_state.exec_report = report_md
 
-أبرز علاقات الارتباط المكتشفة:
-{chr(10).join(corr_insights) if corr_insights else "لا توجد ارتباطات خطية قوية"}
+    if "exec_report" in st.session_state and st.session_state.exec_report:
+        st.markdown(st.session_state.exec_report)
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            st.download_button(
+                "📥 تحميل التقرير (Markdown)",
+                data=st.session_state.exec_report.encode("utf-8"),
+                file_name="Executive_Strategy_Report.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+        with dl2:
+            html_report = f"""
+            <html dir="rtl" lang="ar">
+            <head><meta charset="utf-8"><style>
+            body {{ font-family: Arial, sans-serif; background:#0d1426; color:#f3f4f6; padding:30px; line-height:1.7; }}
+            h1, h2, h3 {{ color:#e5c158; }}
+            </style></head>
+            <body><h1>التقرير التنفيذي الشامل — AI Data Analyst Pro</h1><pre style="white-space:pre-wrap; font-family:inherit;">{st.session_state.exec_report}</pre></body>
+            </html>
+            """
+            st.download_button(
+                "🌐 تحميل التقرير (HTML)",
+                data=html_report.encode("utf-8"),
+                file_name="Executive_Strategy_Report.html",
+                mime="text/html",
+                use_container_width=True,
+            )
 
-توزيع الفئات الرئيسية:
-{chr(10).join(top_cat_insights) if top_cat_insights else "لا توجد أعمدة تصنيفية محدودة"}
+    st.markdown("---")
+    st.markdown('<div class="section-header">💬 اسأل المحلل الذكي (Interactive AI Chart Builder)</div>', unsafe_allow_html=True)
+    st.caption("اكتب أي سؤال مخصص وسيقوم الذكاء الاصطناعي بتحليل البيانات والإجابة ورسم الشارت المناسب.")
 
-المطلوب: اكتب تقريراً تنفيذياً احترافياً باللغة العربية موجهاً للإدارة العليا، منسقاً بعناوين واضحة ونقاط محددة، ويتضمن الأقسام الأربعة التالية بدقة:
-1. **📌 الملخص التنفيذي (Executive Summary):** نظرة شاملة على حجم البيانات وأهم المؤشرات الرقمية.
-2. **💎 أعمق الرؤى والأنماط المكتشفة (Key Insights):** تحليل الأرقام، الفئات المسيطرة، والعلاقات المؤثرة.
-3. **⚠️ المخاطر ونقاط الضعف المرصودة (Risks & Anomalies):** أي تشتت عالٍ، تركز مفرط في فئة واحدة، أو فجوات في الأداء.
-4. **🎯 خطة العمل والتوصيات الاستراتيجية (Actionable Strategy):** 4 خطوات عملية ومحددة قابلة للتنفيذ فوراً لتحسين الأداء وزيادة العائد.
-"""
-                        rep_response = call_gemini_api(report_prompt)
-                        st.session_state.exec_report_md = rep_response.text
-                    except Exception as e:
-                        st.error(f"حدث خطأ أثناء توليد التقرير: {str(e)}")
+    user_q = st.text_input("...اسأل أي سؤال عن بياناتك (مثال: قارن إجمالي المبيعات حسب الفرع)")
+    if st.button("🚀 تحليل ورسم الشارت") and user_q:
+        with st.spinner("جاري التحليل..."):
+            cols_info = {c: str(df[c].dtype) for c in df.columns}
+            chat_prompt = f"""
+            لديك DataFrame باسم df أعمدته وأنواعها: {cols_info}.
+            أجب عن سؤال المستخدم باختصار ووضوح بالعربية، وإذا كان السؤال يناسبه رسم بياني، أرفق في نهاية ردك كود JSON فقط داخل ```json ... ``` بالشكل التالي:
+            {{"chart_type": "bar|line|pie", "x": "اسم_عمود_x", "y": "اسم_عمود_y", "agg": "sum|mean|count", "title": "عنوان الرسم"}}
+            سؤال المستخدم: {user_q}
+            """
+            ans = ask_gemini_with_fallback(chat_prompt)
+            json_match = re.search(r"```json\s*(\{.*?\})\s*```", ans, re.DOTALL)
+            clean_text = re.sub(r"```json.*?```", "", ans, flags=re.DOTALL).strip()
+            st.markdown(clean_text)
 
-            if st.session_state.get("exec_report_md"):
-                st.markdown("---")
-                st.markdown(st.session_state.exec_report_md)
-                
-                dl_col1, dl_col2 = st.columns(2)
-                with dl_col1:
-                    st.download_button(
-                        label="📄 تحميل التقرير التنفيذي (HTML جاهز للطباعة)",
-                        data=build_html_report(
-                            st.session_state.exec_report_md,
-                            active_file_name,
-                            df.shape[0],
-                            df.shape[1],
-                            health_score
-                        ).encode("utf-8"),
-                        file_name=f"Executive_Report_{active_file_name.split('.')[0]}.html",
-                        mime="text/html",
-                        use_container_width=True
-                    )
-                with dl_col2:
-                    st.download_button(
-                        label="📝 تحميل التقرير كنص منسق (Markdown)",
-                        data=st.session_state.exec_report_md.encode("utf-8"),
-                        file_name=f"Executive_Report_{active_file_name.split('.')[0]}.md",
-                        mime="text/markdown",
-                        use_container_width=True
-                    )
+            if json_match:
+                try:
+                    spec = json.loads(json_match.group(1))
+                    x_col, y_col = spec.get("x"), spec.get("y")
+                    agg_fn = spec.get("agg", "sum")
+                    if x_col in df.columns and y_col in df.columns:
+                        if agg_fn == "mean":
+                            plot_df = df.groupby(x_col, as_index=False)[y_col].mean()
+                        elif agg_fn == "count":
+                            plot_df = df.groupby(x_col, as_index=False)[y_col].count()
+                        else:
+                            plot_df = df.groupby(x_col, as_index=False)[y_col].sum()
 
-            st.divider()
-            st.subheader("💬 اسأل المحلل الذكي (Interactive AI Chart Builder)")
-            st.caption("اكتب أي سؤال مخصص وسيقوم الذكاء الاصطناعي بكتابة الكود، حساب النتيجة من كامل الملف، ورسم الشارت المناسب.")
+                        ctype = spec.get("chart_type", "bar")
+                        if ctype == "line":
+                            fig_ai = px.line(plot_df, x=x_col, y=y_col, markers=True, color_discrete_sequence=["#e5c158"])
+                        elif ctype == "pie":
+                            fig_ai = px.pie(plot_df, names=x_col, values=y_col)
+                        else:
+                            fig_ai = px.bar(plot_df, x=x_col, y=y_col, color_discrete_sequence=["#e5c158"])
 
-            if "chat_history" not in st.session_state or st.session_state.get("chat_file") != active_file_name:
-                st.session_state.chat_history = []
-                st.session_state.chat_file = active_file_name
-
-            for msg in st.session_state.chat_history:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-                    if msg.get("fig") is not None:
-                        st.plotly_chart(msg["fig"], use_container_width=True)
-
-            user_question = st.chat_input("اسأل أي سؤال عن بياناتك (مثال: ارسم العلاقة بين المبيعات والعملاء)...")
-
-            if user_question:
-                st.session_state.chat_history.append({"role": "user", "content": user_question})
-                with st.chat_message("user"):
-                    st.markdown(user_question)
-
-                schema_info = "\n".join([f"- {col} ({dtype})" for col, dtype in df.dtypes.items()])
-                sample_data = df.head(3).to_string()
-
-                prompt = f"""
-أنت محلل بيانات خبير ومبرمج Python محترف.
-لديك DataFrame جاهز باسم `df` يحتوي على الأعمدة التالية وأنواعها:
-{schema_info}
-
-عينة من أول 3 صفوف:
-{sample_data}
-
-سؤال المستخدم: "{user_question}"
-
-المطلوب منك:
-1. كتابة كود Python نظيف ومباشر يستخدم مكتبة `plotly.express as px` (أو `pandas`) للإجابة على السؤال ورسم الشارت الأنسب.
-2. يجب أن تخزن الرسم البياني النهائي في متغير اسمه `fig` بالضبط.
-3. اجعل تصميم الرسم البياني احترافياً ومتناسقاً مع الثيم الداكن باستخدام:
-   `fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")`
-   واستخدم ألواناً متناسقة مثل `#d4af37` أو `#38bdf8`.
-4. لا تستخدم `fig.show()` ولا `st.plotly_chart()` داخل الكود.
-5. أرجع الرد بالصيغة التالية فقط:
-   - أولاً: كود البايثون محصوراً بين ```python و ```
-   - ثانياً: بعد الكود، اكتب فقرة قصيرة ومفيدة باللغة العربية بعنوان **💡 الاستنتاج التحليلي:** تشرح فيها ما يوضحه التحليل أو كيف نقرأ الرسمة.
-"""
-
-                with st.chat_message("assistant"):
-                    with st.spinner("🧠 جاري تحليل البيانات وبناء الرسم البياني..."):
-                        try:
-                            response = call_gemini_api(prompt)
-                            ai_reply = response.text
-
-                            code_match = re.search(r"```python\n(.*?)```", ai_reply, re.DOTALL)
-                            explanation = re.sub(r"```python\n.*?```", "", ai_reply, flags=re.DOTALL).strip()
-
-                            fig_result = None
-                            if code_match:
-                                generated_code = code_match.group(1)
-                                local_vars = {"df": df.copy(), "pd": pd, "np": np, "px": px}
-                                exec(generated_code, {}, local_vars)
-                                fig_result = local_vars.get("fig")
-
-                            if explanation:
-                                st.markdown(explanation)
-                            if fig_result is not None:
-                                st.plotly_chart(fig_result, use_container_width=True)
-
-                            st.session_state.chat_history.append({
-                                "role": "assistant",
-                                "content": explanation,
-                                "fig": fig_result
-                            })
-
-                        except Exception as e:
-                            st.error(f"حدث خطأ أثناء معالجة الطلب: {str(e)}")
-else:
-    st.markdown("""
-    <div style='text-align: center; padding: 60px; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed rgba(212, 175, 55, 0.45); margin-top: 20px;'>
-        <h3 style='text-align: center; color: #d4af37;'>👋 أهلاً بك في مساحة العمل الذكية</h3>
-        <p style='text-align: center; color: #9ca3af;'>ابدأ برفع ملف البيانات (CSV أو Excel) أو اضغط على زر <b>🚀 جرب ببيانات مبيعات جاهزة</b> من القائمة الجانبية لتفعيل التنظيف، المحاكاة، والتقرير التنفيذي الذكي.</p>
-    </div>
-    """, unsafe_allow_html=True)
+                        st.plotly_chart(style_plotly_fig(fig_ai, spec.get("title", "")), use_container_width=True)
+                except Exception:
+                    pass
